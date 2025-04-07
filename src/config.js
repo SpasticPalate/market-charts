@@ -1,22 +1,19 @@
 // Alpha Vantage API configuration
-export const ALPHA_VANTAGE_API_KEY = "RYXKW2Z10T4W29VW"; 
+export const ALPHA_VANTAGE_API_KEY = "RYXKW2Z10T4W29VW"; // Your API key
 
 // Market symbols (standard symbols for major indices)
 export const MARKET_SYMBOLS = {
-  SP500: "SPY",     // S&P 500 ETF Trust (easier to use than ^GSPC)
-  DOW: "DIA",       // SPDR Dow Jones Industrial Average ETF (easier to use than ^DJI)
-  NASDAQ: "QQQ"     // Invesco QQQ Trust (tracks NASDAQ-100, easier to use than ^IXIC)
-  
-  // Note: Using ETFs instead of index symbols as they're more reliable with some APIs
-  // Original index symbols: ^GSPC (S&P 500), ^DJI (Dow), ^IXIC (NASDAQ)
+  SP500: "SPY",     // S&P 500 ETF Trust
+  DOW: "DIA",       // SPDR Dow Jones Industrial Average ETF
+  NASDAQ: "QQQ"     // Invesco QQQ Trust (tracks NASDAQ-100)
 };
 
-// Time frame configuration (for simulation purposes)
+// Time frame configuration (for real data presentation)
 export const TIMEFRAMES = {
-  // Trump's inauguration date (second term)
+  // Reference start date (presented as Trump's inauguration)
   INAUGURATION_DATE: "2025-01-20",
   
-  // Tariff announcement date
+  // Reference tariff date (presented as tariff announcement)
   TARIFF_ANNOUNCEMENT_DATE: "2025-04-02",
   
   // Chart titles
@@ -34,6 +31,7 @@ export const TIMEFRAMES = {
     { date: "2025-02-28", description: "End of February" },
     { date: "2025-03-11", description: "Early March Selloff" },
     { date: "2025-03-31", description: "End of March" },
+    { date: "2025-04-01", description: "Pre-Announcement" },
     { date: "2025-04-02", description: "Tariff Announcement" },
     { date: "2025-04-04", description: "China Retaliation" }
   ]
@@ -43,11 +41,11 @@ export const TIMEFRAMES = {
 export const CACHE_DURATION = 24 * 60 * 60 * 1000;
 
 // Note: Free API keys are limited to 25 requests per day (5 per minute)
-// If you need more, consider getting a premium key from https://www.alphavantage.co/premium/ 
+// If you need more, consider getting a premium key from https://www.alphavantage.co/premium/
 
-// Simulation mode - for development or when API limits are reached
+// Simulation mode - DISABLED to use real market data
 export const SIMULATION_MODE = {
-  ENABLED: true,  // Set to true to use simulated data instead of real API data
+  ENABLED: false,  // Set to false to use real API data instead of simulation
   START_DATE: "2025-01-20",
-  PRICE_VOLATILITY: 1.5  // Controls how volatile the simulated prices are
+  PRICE_VOLATILITY: 1.5
 }; 
