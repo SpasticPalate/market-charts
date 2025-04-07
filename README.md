@@ -1,4 +1,69 @@
-# Getting Started with Create React App
+# Market Charts Application
+
+A React application that displays market performance data for major stock indices (S&P 500, Dow Jones, and NASDAQ) focusing on two key periods:
+
+1. Performance since Trump's second inauguration (Jan 20, 2025)
+2. Impact of tariff announcements on the markets (Apr 2, 2025)
+
+## Features
+
+- Real-time market data visualization using Alpha Vantage API
+- Percentage change tracking from Trump's inauguration date
+- Daily market changes following tariff announcements
+- Configurable event dates and descriptions
+- Simulation mode for development or when API limits are reached
+- Intelligent caching to minimize API calls
+
+## Setup Instructions
+
+1. Clone this repository
+2. Install dependencies with `npm install`
+3. Configure your Alpha Vantage API key:
+   - Get a free API key from [Alpha Vantage](https://www.alphavantage.co/support/#api-key)
+   - Open `src/config.js` and replace `YOUR_API_KEY_HERE` with your actual API key
+
+   ```javascript
+   export const ALPHA_VANTAGE_API_KEY = "YOUR_API_KEY_HERE"; // Replace with your actual API key
+   ```
+
+4. Start the application with `npm start`
+5. The application will automatically fetch and display the latest market data
+
+## Configuration Options
+
+You can modify various settings in `src/config.js`:
+
+### API Configuration
+- `ALPHA_VANTAGE_API_KEY`: Your API key for Alpha Vantage
+- `MARKET_SYMBOLS`: Stock symbols for the indices to track
+
+### Time Frame Settings
+- `INAUGURATION_DATE`: Trump's inauguration date (reference point for first chart)
+- `TARIFF_ANNOUNCEMENT_DATE`: Date when tariffs were announced (reference for second chart)
+- `OVERALL_PERFORMANCE_TITLE`: Title for the first chart
+- `TARIFF_IMPACT_TITLE`: Title for the second chart
+- `DAYS_IN_TARIFF_CHART`: Number of days to show in the tariff impact chart
+- `EVENTS`: Array of specific events to highlight in the charts
+
+### Simulation Mode
+If you want to develop without using API calls or have reached API limits:
+
+```javascript
+export const SIMULATION_MODE = {
+  ENABLED: true,  // Set to true to use simulated data instead of API data
+  START_DATE: "2025-01-20",
+  PRICE_VOLATILITY: 1.5
+};
+```
+
+## Data Handling
+
+- Data is fetched from Alpha Vantage API when the application loads
+- A caching mechanism prevents excessive API calls (data is cached for 24 hours by default)
+- If the API request fails, fallback data is displayed
+- Simulation mode can be enabled to generate realistic market data without API calls
+
+## Getting Started with Create React App
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 

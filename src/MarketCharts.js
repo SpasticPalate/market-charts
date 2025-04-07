@@ -1,36 +1,107 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, ReferenceLine } from 'recharts';
 
-// Card components
-import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
-
-// Data for Trump's second term inauguration to early April 2025
-const marketPerformanceData = [
-  { date: 'Jan 20, 2025', sp500: 0, dow: 0, nasdaq: 0, description: 'Inauguration' },
-  { date: 'Jan 31, 2025', sp500: -2.1, dow: -1.8, nasdaq: -3.5, description: 'End of January' },
-  { date: 'Feb 19, 2025', sp500: 2.6, dow: 1.9, nasdaq: 3.1, description: 'Market Peak' },
-  { date: 'Feb 28, 2025', sp500: 0.2, dow: -0.4, nasdaq: -1.1, description: 'End of February' },
-  { date: 'Mar 11, 2025', sp500: -3.6, dow: -3.6, nasdaq: -6.8, description: 'Early March Selloff' },
-  { date: 'Mar 31, 2025', sp500: -4.6, dow: -5.2, nasdaq: -8.9, description: 'End of March' },
-  { date: 'Apr 2, 2025', sp500: -6.1, dow: -6.8, nasdaq: -10.5, description: 'Tariff Announcement' },
-  { date: 'Apr 4, 2025', sp500: -10.0, dow: -10.5, nasdaq: -20.3, description: 'Latest Data' },
-];
-
-// Data for tariff impact (days surrounding announcement)
-const tariffImpactData = [
-  { date: 'Apr 1, 2025', sp500Change: 0.8, dowChange: 0.6, nasdaqChange: 1.2, description: 'Pre-Announcement' },
-  { date: 'Apr 2, 2025', sp500Change: -0.2, dowChange: -0.3, nasdaqChange: -0.5, description: 'Announcement Day' },
-  { date: 'Apr 3, 2025', sp500Change: -4.8, dowChange: -4.0, nasdaqChange: -6.0, description: 'First Trading Day' },
-  { date: 'Apr 4, 2025', sp500Change: -6.0, dowChange: -5.5, nasdaqChange: -5.8, description: 'China Retaliation' },
-];
+// Import our market data service
+import { getMarketPerformanceData, getTariffImpactData } from './services/marketDataService';
+import { ALPHA_VANTAGE_API_KEY, TIMEFRAMES, SIMULATION_MODE } from './config';
 
 function MarketCharts() {
+  // State for market data
+  const [marketPerformanceData, setMarketPerformanceData] = useState([]);
+  const [tariffImpactData, setTariffImpactData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Load data from API
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        
+        // Check if API key has been set
+        if (ALPHA_VANTAGE_API_KEY === "YOUR_API_KEY_HERE" && !SIMULATION_MODE.ENABLED) {
+          throw new Error("Please set your Alpha Vantage API key in src/config.js or enable simulation mode");
+        }
+        
+        // Get market performance data since inauguration
+        const performanceData = await getMarketPerformanceData();
+        
+        if (performanceData.length === 0) {
+          throw new Error("No market performance data received from API");
+        }
+        
+        setMarketPerformanceData(performanceData);
+        
+        // Get tariff impact data
+        const tariffData = await getTariffImpactData();
+        
+        if (tariffData.length === 0) {
+          throw new Error("No tariff impact data received from API");
+        }
+        
+        setTariffImpactData(tariffData);
+        setError(null);
+      } catch (err) {
+        console.error('Error loading market data:', err);
+        setError(`Failed to load market data: ${err.message}`);
+        
+        // Use fallback data if API fails
+        setMarketPerformanceData([
+          { date: 'Jan 20, 2025', sp500: 0, dow: 0, nasdaq: 0, description: 'Inauguration' },
+          { date: 'Jan 31, 2025', sp500: -2.1, dow: -1.8, nasdaq: -3.5, description: 'End of January' },
+          { date: 'Feb 19, 2025', sp500: 2.6, dow: 1.9, nasdaq: 3.1, description: 'Market Peak' },
+          { date: 'Feb 28, 2025', sp500: 0.2, dow: -0.4, nasdaq: -1.1, description: 'End of February' },
+          { date: 'Apr 4, 2025', sp500: -10.0, dow: -10.5, nasdaq: -20.3, description: 'Latest Data' },
+        ]);
+        
+        setTariffImpactData([
+          { date: 'Apr 1, 2025', sp500Change: 0.8, dowChange: 0.6, nasdaqChange: 1.2, description: 'Pre-Announcement' },
+          { date: 'Apr 2, 2025', sp500Change: -0.2, dowChange: -0.3, nasdaqChange: -0.5, description: 'Tariff Announcement' },
+          { date: 'Apr 3, 2025', sp500Change: -4.8, dowChange: -4.0, nasdaqChange: -6.0, description: 'First Trading Day' },
+          { date: 'Apr 4, 2025', sp500Change: -6.0, dowChange: -5.5, nasdaqChange: -5.8, description: 'China Retaliation' },
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="App" style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto', textAlign: 'center' }}>
+        <h1>Loading Market Data...</h1>
+        <p>Fetching the latest market data from Alpha Vantage...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="App" style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto', textAlign: 'center' }}>
+        <h1>Error Loading Data</h1>
+        <p style={{ color: 'red' }}>{error}</p>
+        <p>Displaying fallback data instead.</p>
+        <p style={{ fontSize: '0.9rem', marginTop: '20px' }}>
+          Troubleshooting tips:
+          <ul style={{ textAlign: 'left', listStylePosition: 'inside' }}>
+            <li>Make sure you've set your Alpha Vantage API key in src/config.js</li>
+            <li>Check the browser console for detailed error messages</li>
+            <li>The free API tier is limited to 25 requests per day - you may have reached your limit</li>
+            <li>Consider enabling simulation mode in config.js if you're experiencing API rate limiting</li>
+          </ul>
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="App" style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
-      <h1>Market Performance Since Trump's Inauguration (2025)</h1>
+      <h1>Market Performance Dashboard</h1>
       
       <div style={{ marginBottom: '40px' }}>
-        <h2>Market Performance Since Trump's Inauguration (Jan 20 - Apr 4, 2025)</h2>
+        <h2>{TIMEFRAMES.OVERALL_PERFORMANCE_TITLE}</h2>
         <div style={{ height: '400px' }}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
@@ -44,10 +115,17 @@ function MarketCharts() {
                 domain={['dataMin - 2', 'dataMax + 2']}
               />
               <Tooltip 
-                formatter={(value, name) => [`${value}%`, name === "sp500" ? "S&P 500" : name === "dow" ? "Dow Jones" : "NASDAQ"]}
+                formatter={(value, name) => {
+                  // Fix for tooltip issue - map each dataKey to the correct name
+                  const mappedName = 
+                    name === "sp500" ? "S&P 500" : 
+                    name === "dow" ? "Dow Jones" : 
+                    name === "nasdaq" ? "NASDAQ" : name;
+                  return [`${value}%`, mappedName];
+                }}
                 labelFormatter={(label) => {
                   const item = marketPerformanceData.find(d => d.date === label);
-                  return `${label} (${item.description})`;
+                  return item ? `${label} (${item.description})` : label;
                 }}
               />
               <Legend />
@@ -61,7 +139,7 @@ function MarketCharts() {
       </div>
 
       <div style={{ marginBottom: '40px' }}>
-        <h2>Daily Market Changes Following Tariff Announcement (Apr 1-4, 2025)</h2>
+        <h2>{TIMEFRAMES.TARIFF_IMPACT_TITLE}</h2>
         <div style={{ height: '400px' }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
@@ -75,10 +153,17 @@ function MarketCharts() {
                 domain={['dataMin - 1', 'dataMax + 1']}
               />
               <Tooltip 
-                formatter={(value, name) => [`${value}%`, name === "sp500Change" ? "S&P 500" : name === "dowChange" ? "Dow Jones" : "NASDAQ"]}
+                formatter={(value, name) => {
+                  // Fix for tooltip issue - map each dataKey to the correct name
+                  const mappedName = 
+                    name === "sp500Change" ? "S&P 500" : 
+                    name === "dowChange" ? "Dow Jones" : 
+                    name === "nasdaqChange" ? "NASDAQ" : name;
+                  return [`${value}%`, mappedName];
+                }}
                 labelFormatter={(label) => {
                   const item = tariffImpactData.find(d => d.date === label);
-                  return `${label} (${item.description})`;
+                  return item ? `${label} (${item.description})` : label;
                 }}
               />
               <Legend />
@@ -89,6 +174,13 @@ function MarketCharts() {
             </BarChart>
           </ResponsiveContainer>
         </div>
+      </div>
+      
+      <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '40px', textAlign: 'center' }}>
+        <p>
+          Data source: {SIMULATION_MODE.ENABLED ? 'Simulation Mode' : 'Alpha Vantage API'} | 
+          Last updated: {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}
+        </p>
       </div>
     </div>
   );
