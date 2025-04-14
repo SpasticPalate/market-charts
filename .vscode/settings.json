@@ -1,0 +1,10 @@
+{
+  "dotnet-test-explorer.testProjectPath": "**/*.Tests.csproj",
+  "dotnet-test-explorer.autoWatch": true,
+  "dotnet-test-explorer.showCodeLens": true,
+  "dotnet-test-explorer.codeLensFailed": "❌",
+  "dotnet-test-explorer.codeLensPassed": "✅",
+  "dotnet-test-explorer.testArguments": "/p:CollectCoverage=true /p:CoverletOutputFormat=lcov",
+  "dotnet-test-explorer.enableTelemetry": false,
+  "dotnet.defaultSolution": "market-charts.sln"
+}
