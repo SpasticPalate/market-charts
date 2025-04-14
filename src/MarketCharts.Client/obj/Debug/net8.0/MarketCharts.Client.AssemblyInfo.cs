@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("MarketCharts.Client")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+4aacfda6cbf9047d3273512fb7da00484c71ade6")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+03732761908d3ecfe52a8732a6ba39ae611f5325")]
 [assembly: System.Reflection.AssemblyProductAttribute("MarketCharts.Client")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MarketCharts.Client")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
