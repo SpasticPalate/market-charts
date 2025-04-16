@@ -5,6 +5,9 @@ using MarketCharts.Client.Interfaces;
 using MarketCharts.Client.Models;
 using MarketCharts.Client.Models.Chart;
 using MarketCharts.Client.Models.Configuration;
+using MarketCharts.Client.Services.ApiServices;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using System.Net.Http.Json;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
@@ -29,8 +32,52 @@ builder.Services.AddScoped(sp =>
     }
 });
 
-// Register services (interfaces will be implemented later)
-builder.Services.AddScoped<IApiServiceFactory, ApiServiceFactory>();
+// Register API configuration
+builder.Services.AddScoped<ApiConfiguration>(sp => 
+{
+    var appConfig = sp.GetRequiredService<AppConfiguration>();
+    return appConfig.ApiConfig;
+});
+
+// Register HTTP clients
+builder.Services.AddHttpClient();
+
+// Register API services
+builder.Services.AddScoped<PrimaryApiService>(sp => 
+{
+    var httpClient = new HttpClient { BaseAddress = new Uri("https://www.alphavantage.co/") };
+    var apiConfig = sp.GetRequiredService<ApiConfiguration>();
+    var logger = sp.GetRequiredService<ILogger<PrimaryApiService>>();
+    return new PrimaryApiService(apiConfig, httpClient, logger);
+});
+
+builder.Services.AddScoped<BackupApiService>(sp => 
+{
+    var httpClient = new HttpClient { BaseAddress = new Uri("https://api.stockdata.org/") };
+    var apiConfig = sp.GetRequiredService<ApiConfiguration>();
+    var logger = sp.GetRequiredService<ILogger<BackupApiService>>();
+    return new BackupApiService(apiConfig, httpClient, logger);
+});
+
+// Register API services as IStockApiService
+builder.Services.AddScoped<IStockApiService>(sp => sp.GetRequiredService<PrimaryApiService>());
+builder.Services.AddScoped<IStockApiService>(sp => sp.GetRequiredService<BackupApiService>());
+
+// Register API service factory
+builder.Services.AddScoped<IApiServiceFactory, ApiServiceFactory>(sp => 
+{
+    var primaryApiService = sp.GetRequiredService<PrimaryApiService>();
+    var backupApiService = sp.GetRequiredService<BackupApiService>();
+    var apiConfig = sp.GetRequiredService<ApiConfiguration>();
+    var logger = sp.GetRequiredService<ILogger<ApiServiceFactory>>();
+    return new ApiServiceFactory(
+        primaryApiService, 
+        backupApiService, 
+        apiConfig, 
+        logger);
+});
+
+// Register other services (interfaces will be implemented later)
 builder.Services.AddScoped<IStockDataRepository, StockDataRepository>();
 builder.Services.AddScoped<IStockDataService, StockDataService>();
 builder.Services.AddScoped<IChartDataProcessor, ChartDataProcessor>();
@@ -41,16 +88,6 @@ await builder.Build().RunAsync();
 // They are defined here to allow the application to compile
 namespace MarketCharts.Client
 {
-    public class ApiServiceFactory : IApiServiceFactory
-    {
-        public Task<bool> AreAllApiServicesUnavailableAsync() => throw new NotImplementedException();
-        public IStockApiService GetBackupApiService() => throw new NotImplementedException();
-        public DateTime? GetPrimaryApiRetryTime() => throw new NotImplementedException();
-        public IStockApiService GetPrimaryApiService() => throw new NotImplementedException();
-        public Task<IStockApiService> GetApiServiceAsync() => throw new NotImplementedException();
-        public Task NotifyPrimaryApiFailureAsync(Exception exception) => throw new NotImplementedException();
-        public Task<bool> TryResetToPrimaryApiAsync() => throw new NotImplementedException();
-    }
 
     public class StockDataRepository : IStockDataRepository
     {
