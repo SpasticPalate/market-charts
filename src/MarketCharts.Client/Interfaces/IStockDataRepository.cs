@@ -92,5 +92,12 @@ namespace MarketCharts.Client.Interfaces
         /// </summary>
         /// <returns>True if initialization was successful, false otherwise</returns>
         Task<bool> InitializeSchemaAsync();
+
+        /// <summary>
+        /// Deletes a stock index data point from the repository
+        /// </summary>
+        /// <param name="id">The ID of the data to delete</param>
+        /// <returns>True if the deletion was successful, false otherwise</returns>
+        Task<bool> DeleteStockDataAsync(int id);
     }
 }

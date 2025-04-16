@@ -1,0 +1,625 @@
+@page "/dashboard"
+@using MarketCharts.Client.Models
+@using MarketCharts.Client.Models.Chart
+@using MarketCharts.Client.Interfaces
+@using System.Globalization
+@inject IStockDataService StockDataService
+@inject IChartDataProcessor ChartDataProcessor
+
+<div class="dashboard-container @(IsResponsive ? "responsive" : "") @(IsDarkMode ? "dark-mode" : "")">
+    <h1 class="dashboard-title">Market Charts Dashboard</h1>
+    
+    @if (IsLoading)
+    {
+        <div class="loading-container">
+            <div class="spinner"></div>
+            <p>Loading market data...</p>
+        </div>
+    }
+    else if (HasError)
+    {
+        <div class="error-container">
+            <div class="error-icon">⚠️</div>
+            <h2>Unable to Load Data</h2>
+            <p>@ErrorMessage</p>
+            <button class="retry-button" @onclick="LoadData">Retry</button>
+        </div>
+    }
+    else
+    {
+        <div class="dashboard-controls">
+            <div class="timeframe-selector">
+                <label for="timeframe">Timeframe:</label>
+                <select id="timeframe" @bind="SelectedTimeframe" @oninput="TimeframeChanged">
+                    @foreach (var timeframe in Timeframes)
+                    {
+                        <option value="@timeframe.Value">@timeframe.Label</option>
+                    }
+                </select>
+            </div>
+            
+            <div class="theme-toggle">
+                <label for="theme-toggle">Dark Mode:</label>
+                <input type="checkbox" id="theme-toggle" @bind="IsDarkMode" />
+            </div>
+            
+            <div class="info-button" @onclick="ToggleHelp">
+                <span class="info-icon">ℹ️</span>
+            </div>
+        </div>
+        
+        @if (ShowHelp)
+        {
+            <div class="help-container">
+                <div class="help-content">
+                    <h3>Dashboard Help</h3>
+                    <p>This dashboard displays stock market indices over different timeframes.</p>
+                    <ul>
+                        <li><strong>Timeframe:</strong> Select different time periods to view market performance.</li>
+                        <li><strong>Dark Mode:</strong> Toggle between light and dark themes.</li>
+                        <li><strong>Charts:</strong> Hover over data points to see detailed information.</li>
+                        <li><strong>Comparison:</strong> Enable comparison with previous periods when available.</li>
+                    </ul>
+                    <button class="close-help" @onclick="ToggleHelp">Close</button>
+                </div>
+            </div>
+        }
+        
+        <div class="charts-container">
+            <div class="chart-wrapper primary-chart">
+                <IndexChartComponent 
+                    Title="@PrimaryChartTitle" 
+                    ChartData="@PrimaryChartData" 
+                    IsLoading="@IsRefreshing"
+                    IsDarkMode="@IsDarkMode"
+                    OnChartInteraction="@HandleChartInteraction" />
+            </div>
+            
+            @if (ShowComparisonChart)
+            {
+                <div class="chart-wrapper comparison-chart">
+                    <IndexChartComponent 
+                        Title="@ComparisonChartTitle" 
+                        ChartData="@ComparisonChartData" 
+                        IsLoading="@IsRefreshing"
+                        IsDarkMode="@IsDarkMode"
+                        ShowComparisonToggle="true"
+                        ComparisonEnabled="@ComparisonEnabled"
+                        OnComparisonToggled="@HandleComparisonToggled"
+                        OnChartInteraction="@HandleChartInteraction" />
+                </div>
+            }
+        </div>
+        
+        @if (LastUpdateTime.HasValue)
+        {
+            <div class="last-update">
+                Last updated: @LastUpdateTime.Value.ToString("g", CultureInfo.CurrentCulture)
+            </div>
+        }
+        
+        @if (SelectedMetadata != null)
+        {
+            <div class="metadata-panel">
+                <h3>@SelectedMetadata.Title</h3>
+                <div class="metadata-content">
+                    @foreach (var item in SelectedMetadata.Items)
+                    {
+                        <div class="metadata-item">
+                            <span class="metadata-label">@item.Key:</span>
+                            <span class="metadata-value">@item.Value</span>
+                        </div>
+                    }
+                </div>
+                <button class="close-metadata" @onclick="@(() => SelectedMetadata = null)">Close</button>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private bool IsLoading { get; set; } = true;
+    private bool IsRefreshing { get; set; } = false;
+    private bool HasError { get; set; } = false;
+    private string ErrorMessage { get; set; } = string.Empty;
+    private bool IsDarkMode { get; set; } = false;
+    private bool ShowHelp { get; set; } = false;
+    private bool IsResponsive { get; set; } = true;
+    private DateTime? LastUpdateTime { get; set; }
+    
+    private ChartData PrimaryChartData { get; set; }
+    private ChartData ComparisonChartData { get; set; }
+    private string PrimaryChartTitle { get; set; } = "Market Performance";
+    private string ComparisonChartTitle { get; set; } = "Comparison with Previous Administration";
+    private bool ShowComparisonChart { get; set; } = true;
+    private bool ComparisonEnabled { get; set; } = false;
+    
+    private string SelectedTimeframe { get; set; } = "1Y";
+    private MetadataViewModel SelectedMetadata { get; set; }
+    
+    private List<TimeframeOption> Timeframes { get; set; } = new List<TimeframeOption>
+    {
+        new TimeframeOption { Value = "1M", Label = "1 Month" },
+        new TimeframeOption { Value = "3M", Label = "3 Months" },
+        new TimeframeOption { Value = "6M", Label = "6 Months" },
+        new TimeframeOption { Value = "1Y", Label = "1 Year" },
+        new TimeframeOption { Value = "2Y", Label = "2 Years" },
+        new TimeframeOption { Value = "4Y", Label = "4 Years (Administration)" },
+        new TimeframeOption { Value = "MAX", Label = "Maximum Available" }
+    };
+    
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+    
+    private async Task LoadData()
+    {
+        try
+        {
+            IsLoading = true;
+            HasError = false;
+            ErrorMessage = string.Empty;
+            
+            // Calculate date range based on selected timeframe
+            var (startDate, endDate) = CalculateDateRange(SelectedTimeframe);
+            
+            // Get stock data from service based on timeframe
+            Dictionary<string, List<StockIndexData>> stockData;
+            
+            if (SelectedTimeframe == "4Y")
+            {
+                stockData = await StockDataService.GetInaugurationToPresent();
+            }
+            else if (SelectedTimeframe == "MAX")
+            {
+                // For MAX timeframe, we'll need to combine data from multiple sources
+                var inaugurationData = await StockDataService.GetInaugurationToPresent();
+                var previousData = await StockDataService.GetPreviousAdministrationData();
+                
+                // Combine the data
+                stockData = new Dictionary<string, List<StockIndexData>>();
+                foreach (var key in inaugurationData.Keys)
+                {
+                    var combinedList = new List<StockIndexData>();
+                    if (previousData.ContainsKey(key))
+                    {
+                        combinedList.AddRange(previousData[key]);
+                    }
+                    combinedList.AddRange(inaugurationData[key]);
+                    stockData[key] = combinedList;
+                }
+            }
+            else
+            {
+                // For other timeframes, we'll use the inauguration data but filter by date
+                stockData = await StockDataService.GetInaugurationToPresent();
+                
+                // Filter by date range
+                foreach (var key in stockData.Keys.ToList())
+                {
+                    stockData[key] = stockData[key]
+                        .Where(d => d.Date >= startDate && d.Date <= endDate)
+                        .ToList();
+                }
+            }
+            
+            if (stockData == null || !stockData.Any())
+            {
+                throw new Exception("No data available for the selected timeframe.");
+            }
+            
+            // Format data for primary chart
+            PrimaryChartData = ChartDataProcessor.FormatDataForChart(
+                stockData, 
+                $"Market Performance - {GetTimeframeLabel(SelectedTimeframe)}", 
+                startDate, 
+                endDate);
+            
+            // Handle missing dates (weekends, holidays)
+            PrimaryChartData = ChartDataProcessor.HandleMissingDates(PrimaryChartData);
+            
+            // Apply technical indicators if needed
+            if (SelectedTimeframe == "1Y" || SelectedTimeframe == "2Y" || SelectedTimeframe == "4Y")
+            {
+                PrimaryChartData = ChartDataProcessor.ApplyTechnicalIndicators(
+                    PrimaryChartData, 
+                    new List<string> { "SMA" });
+            }
+            
+            // For comparison chart (if showing 4Y administration data)
+            if (SelectedTimeframe == "4Y")
+            {
+                // Get previous administration data
+                var previousData = await StockDataService.GetPreviousAdministrationData();
+                
+                if (previousData != null && previousData.Any())
+                {
+                    // Create comparison chart
+                    ComparisonChartData = ChartDataProcessor.GenerateComparisonData(PrimaryChartData, previousData);
+                    ShowComparisonChart = true;
+                }
+                else
+                {
+                    ShowComparisonChart = false;
+                }
+            }
+            else
+            {
+                ShowComparisonChart = false;
+            }
+            
+            // Update titles based on timeframe
+            UpdateChartTitles();
+            
+            // Record update time
+            LastUpdateTime = StockDataService.GetLastUpdateTime() ?? DateTime.Now;
+        }
+        catch (Exception ex)
+        {
+            HasError = true;
+            ErrorMessage = $"Failed to load market data: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+            IsRefreshing = false;
+        }
+    }
+    
+    private void TimeframeChanged(ChangeEventArgs e)
+    {
+        SelectedTimeframe = e.Value.ToString();
+        IsRefreshing = true;
+        InvokeAsync(LoadData);
+    }
+    
+    private void ToggleHelp()
+    {
+        ShowHelp = !ShowHelp;
+    }
+    
+    private void HandleComparisonToggled(bool enabled)
+    {
+        ComparisonEnabled = enabled;
+        StateHasChanged();
+    }
+    
+    private void HandleChartInteraction(ChartInteractionEventArgs args)
+    {
+        if (args != null && args.SeriesName != null && args.Label != null)
+        {
+            SelectedMetadata = new MetadataViewModel
+            {
+                Title = $"{args.SeriesName} - {args.Label}",
+                Items = new Dictionary<string, string>()
+            };
+            
+            if (args.DataPoint.HasValue)
+            {
+                SelectedMetadata.Items.Add("Value", args.DataPoint.Value.Value.ToString("N2"));
+                if (args.DataPoint.Value.Change.HasValue)
+                {
+                    SelectedMetadata.Items.Add("Change", args.DataPoint.Value.Change.Value.ToString("+0.00;-0.00;0.00") + "%");
+                }
+            }
+            
+            SelectedMetadata.Items.Add("Date", args.Label);
+            
+            if (args.TechnicalIndicators != null)
+            {
+                foreach (var indicator in args.TechnicalIndicators)
+                {
+                    if (indicator.Value.HasValue)
+                    {
+                        SelectedMetadata.Items.Add(indicator.Key, indicator.Value.Value.ToString("N2"));
+                    }
+                }
+            }
+        }
+        else
+        {
+            SelectedMetadata = null;
+        }
+        
+        StateHasChanged();
+    }
+    
+    private void UpdateChartTitles()
+    {
+        var timeframeLabel = GetTimeframeLabel(SelectedTimeframe);
+        PrimaryChartTitle = $"Market Performance - {timeframeLabel}";
+        
+        if (SelectedTimeframe == "4Y")
+        {
+            ComparisonChartTitle = "Comparison with Previous Administration";
+        }
+    }
+    
+    private (DateTime startDate, DateTime endDate) CalculateDateRange(string timeframe)
+    {
+        var endDate = DateTime.Today;
+        var startDate = timeframe switch
+        {
+            "1M" => endDate.AddMonths(-1),
+            "3M" => endDate.AddMonths(-3),
+            "6M" => endDate.AddMonths(-6),
+            "1Y" => endDate.AddYears(-1),
+            "2Y" => endDate.AddYears(-2),
+            "4Y" => endDate.AddYears(-4),
+            "MAX" => new DateTime(2000, 1, 1), // Arbitrary start date for "MAX"
+            _ => endDate.AddYears(-1) // Default to 1 year
+        };
+        
+        return (startDate, endDate);
+    }
+    
+    private string GetTimeframeLabel(string timeframe)
+    {
+        return Timeframes.FirstOrDefault(t => t.Value == timeframe)?.Label ?? "Custom";
+    }
+    
+    private class TimeframeOption
+    {
+        public string Value { get; set; }
+        public string Label { get; set; }
+    }
+    
+    private class MetadataViewModel
+    {
+        public string Title { get; set; }
+        public Dictionary<string, string> Items { get; set; } = new Dictionary<string, string>();
+    }
+    
+    private class ChartInteractionEventArgs
+    {
+        public string SeriesName { get; set; }
+        public string Label { get; set; }
+        public (decimal Value, decimal? Change)? DataPoint { get; set; }
+        public Dictionary<string, decimal?> TechnicalIndicators { get; set; }
+    }
+}
+
+<style>
+    .dashboard-container {
+        padding: 1rem;
+        font-family: var(--font-family);
+        transition: all 0.3s ease;
+    }
+    
+    .dashboard-container.responsive {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .dashboard-title {
+        margin-bottom: 1.5rem;
+        color: var(--primary-color);
+        text-align: center;
+    }
+    
+    .dashboard-controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        padding: 0.5rem;
+        background-color: var(--surface-color);
+        border-radius: 0.5rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    .timeframe-selector, .theme-toggle {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .timeframe-selector select {
+        padding: 0.5rem;
+        border-radius: 0.25rem;
+        border: 1px solid var(--border-color);
+        background-color: var(--input-bg-color);
+        color: var(--text-color);
+    }
+    
+    .info-button {
+        cursor: pointer;
+        width: 2rem;
+        height: 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background-color: var(--info-color);
+        color: white;
+        transition: transform 0.2s ease;
+    }
+    
+    .info-button:hover {
+        transform: scale(1.1);
+    }
+    
+    .help-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+    
+    .help-content {
+        background-color: var(--surface-color);
+        padding: 2rem;
+        border-radius: 0.5rem;
+        max-width: 600px;
+        width: 90%;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+    
+    .charts-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .chart-wrapper {
+        flex: 1 1 100%;
+        min-width: 300px;
+        background-color: var(--surface-color);
+        border-radius: 0.5rem;
+        padding: 1rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    .chart-wrapper:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    @@media (min-width: 992px) {
+        .chart-wrapper {
+            flex: 1 1 calc(50% - 0.75rem);
+        }
+    }
+    
+    .loading-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 3rem;
+    }
+    
+    .spinner {
+        width: 50px;
+        height: 50px;
+        border: 5px solid rgba(0, 0, 0, 0.1);
+        border-radius: 50%;
+        border-top-color: var(--primary-color);
+        animation: spin 1s ease-in-out infinite;
+        margin-bottom: 1rem;
+    }
+    
+    @@keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    .error-container {
+        text-align: center;
+        padding: 2rem;
+        background-color: var(--error-bg-color);
+        border-radius: 0.5rem;
+        color: var(--error-text-color);
+    }
+    
+    .error-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+    }
+    
+    .retry-button {
+        margin-top: 1rem;
+        padding: 0.5rem 1.5rem;
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        border-radius: 0.25rem;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+    }
+    
+    .retry-button:hover {
+        background-color: var(--primary-dark-color);
+    }
+    
+    .last-update {
+        text-align: right;
+        font-size: 0.8rem;
+        color: var(--secondary-text-color);
+        margin-top: 1rem;
+    }
+    
+    .metadata-panel {
+        position: fixed;
+        bottom: 1rem;
+        right: 1rem;
+        background-color: var(--surface-color);
+        border-radius: 0.5rem;
+        padding: 1rem;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        max-width: 300px;
+        z-index: 100;
+    }
+    
+    .metadata-content {
+        margin: 1rem 0;
+    }
+    
+    .metadata-item {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+    }
+    
+    .metadata-label {
+        font-weight: bold;
+        margin-right: 1rem;
+    }
+    
+    .close-metadata, .close-help {
+        padding: 0.25rem 0.75rem;
+        background-color: var(--secondary-color);
+        color: white;
+        border: none;
+        border-radius: 0.25rem;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+    }
+    
+    .close-metadata:hover, .close-help:hover {
+        background-color: var(--secondary-dark-color);
+    }
+    
+    /* CSS Variables for theming */
+    :root {
+        --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        --primary-color: #0078d4;
+        --primary-dark-color: #005a9e;
+        --secondary-color: #5c2d91;
+        --secondary-dark-color: #4a2376;
+        --text-color: #323130;
+        --secondary-text-color: #605e5c;
+        --surface-color: #ffffff;
+        --background-color: #f3f2f1;
+        --border-color: #8a8886;
+        --input-bg-color: #ffffff;
+        --info-color: #0078d4;
+        --error-bg-color: #fde7e9;
+        --error-text-color: #a4262c;
+    }
+    
+    /* Dark mode variables */
+    .dashboard-container.dark-mode {
+        --primary-color: #2b88d8;
+        --primary-dark-color: #0078d4;
+        --secondary-color: #7c43bd;
+        --secondary-dark-color: #5c2d91;
+        --text-color: #f3f2f1;
+        --secondary-text-color: #c8c6c4;
+        --surface-color: #323130;
+        --background-color: #201f1e;
+        --border-color: #605e5c;
+        --input-bg-color: #3b3a39;
+        --info-color: #2b88d8;
+        --error-bg-color: #442726;
+        --error-text-color: #f1707b;
+    }
+</style>

@@ -6,6 +6,8 @@ using MarketCharts.Client.Models;
 using MarketCharts.Client.Models.Chart;
 using MarketCharts.Client.Models.Configuration;
 using MarketCharts.Client.Services.ApiServices;
+using MarketCharts.Client.Services.Compatibility;
+using MarketCharts.Client.Services.Deployment;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Net.Http.Json;
@@ -82,7 +84,37 @@ builder.Services.AddScoped<IStockDataRepository, StockDataRepository>();
 builder.Services.AddScoped<IStockDataService, StockDataService>();
 builder.Services.AddScoped<IChartDataProcessor, ChartDataProcessor>();
 
-await builder.Build().RunAsync();
+// Register browser compatibility service
+builder.Services.AddScoped<IBrowserCompatibilityService, BrowserCompatibilityService>();
+
+// Register deployment services
+builder.Services.AddScoped<IDeploymentService, VercelDeploymentService>();
+builder.Services.AddScoped<IVersionManagementService, VersionManagementService>();
+
+var host = builder.Build();
+
+// Initialize services
+var serviceProvider = host.Services;
+
+// Initialize browser compatibility service
+var browserCompatibilityService = serviceProvider.GetRequiredService<IBrowserCompatibilityService>();
+await browserCompatibilityService.InitializeAsync();
+
+// Initialize deployment services
+var deploymentService = serviceProvider.GetRequiredService<IDeploymentService>();
+await deploymentService.InitializeAsync();
+
+var versionManagementService = serviceProvider.GetRequiredService<IVersionManagementService>();
+await versionManagementService.InitializeAsync();
+
+// Check if migrations are needed
+if (await versionManagementService.AreMigrationsNeededAsync())
+{
+    await versionManagementService.ExecuteMigrationsAsync();
+}
+
+// Run the application
+await host.RunAsync();
 
 // These are placeholder classes that will be implemented later
 // They are defined here to allow the application to compile
@@ -93,6 +125,7 @@ namespace MarketCharts.Client
     {
         public Task<bool> BackupDatabaseAsync(string backupPath) => throw new NotImplementedException();
         public Task<bool> CompactDatabaseAsync() => throw new NotImplementedException();
+        public Task<bool> DeleteStockDataAsync(int id) => throw new NotImplementedException();
         public void Dispose() { }
         public Task<StockIndexData?> GetLatestStockDataAsync(string indexName) => throw new NotImplementedException();
         public Task<StockIndexData?> GetStockDataByDateAndIndexAsync(DateTime date, string indexName) => throw new NotImplementedException();

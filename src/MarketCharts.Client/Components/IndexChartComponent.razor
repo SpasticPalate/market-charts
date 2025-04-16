@@ -1,0 +1,288 @@
+@using MarketCharts.Client.Models.Chart
+@using System.Globalization
+
+<div class="chart-component @(IsDarkMode ? "dark-mode" : "")">
+    <div class="chart-header">
+        <h3 class="chart-title">@Title</h3>
+        
+        @if (ShowComparisonToggle)
+        {
+            <div class="comparison-toggle">
+                <label>
+                    <input type="checkbox" checked="@ComparisonEnabled" @onchange="HandleComparisonToggled" />
+                    Show Comparison
+                </label>
+            </div>
+        }
+        
+        <div class="chart-controls">
+            <button class="chart-control-button" @onclick="ToggleTechnicalIndicators" title="Toggle Technical Indicators">
+                <span class="chart-control-icon">📊</span>
+            </button>
+            <button class="chart-control-button" @onclick="ExportChart" title="Export Chart">
+                <span class="chart-control-icon">📥</span>
+            </button>
+        </div>
+    </div>
+    
+    @if (IsLoading)
+    {
+        <div class="chart-loading">
+            <div class="chart-spinner"></div>
+            <p>Loading chart data...</p>
+        </div>
+    }
+    else if (ChartData == null || !ChartData.Series.Any())
+    {
+        <div class="chart-error">
+            <p>No data available to display.</p>
+        </div>
+    }
+    else
+    {
+        <div class="chart-container" id="@ChartContainerId">
+            <div class="chart-canvas-container">
+                <canvas id="@ChartCanvasId" width="800" height="400"></canvas>
+            </div>
+            
+            @if (ChartData.Series.Count > 1)
+            {
+                <div class="chart-legend">
+                    @foreach (var series in ChartData.Series)
+                    {
+                        <div class="legend-item">
+                            <span class="legend-color" style="background-color: @series.Color"></span>
+                            <span class="legend-label">@series.Name</span>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string Title { get; set; } = "Market Index Chart";
+    
+    [Parameter]
+    public ChartData ChartData { get; set; }
+    
+    [Parameter]
+    public bool IsLoading { get; set; } = false;
+    
+    [Parameter]
+    public bool IsDarkMode { get; set; } = false;
+    
+    [Parameter]
+    public bool ShowComparisonToggle { get; set; } = false;
+    
+    [Parameter]
+    public bool ComparisonEnabled { get; set; } = false;
+    
+    [Parameter]
+    public EventCallback<bool> OnComparisonToggled { get; set; }
+    
+    [Parameter]
+    public EventCallback<ChartInteractionEventArgs> OnChartInteraction { get; set; }
+    
+    private string ChartContainerId => $"chart-container-{Guid.NewGuid().ToString("N")}";
+    private string ChartCanvasId => $"chart-canvas-{Guid.NewGuid().ToString("N")}";
+    private bool ShowTechnicalIndicators { get; set; } = false;
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InitializeChartAsync();
+        }
+        else if (ChartData != null && !IsLoading)
+        {
+            await UpdateChartAsync();
+        }
+    }
+    
+    private async Task InitializeChartAsync()
+    {
+        if (ChartData == null || IsLoading)
+        {
+            return;
+        }
+        
+        // In a real implementation, this would use JavaScript interop to initialize
+        // a chart library like Chart.js, ApexCharts, or Highcharts
+        await Task.Delay(100); // Simulate chart initialization
+        
+        // Set up event handlers for chart interactions
+        await SetupChartInteractionsAsync();
+    }
+    
+    private async Task UpdateChartAsync()
+    {
+        // In a real implementation, this would update the chart with new data
+        await Task.Delay(100); // Simulate chart update
+    }
+    
+    private async Task SetupChartInteractionsAsync()
+    {
+        // In a real implementation, this would set up event handlers for chart interactions
+        // like hovering over data points, clicking on chart elements, etc.
+        await Task.Delay(50); // Simulate setup
+    }
+    
+    private async Task HandleComparisonToggled(ChangeEventArgs e)
+    {
+        ComparisonEnabled = (bool)e.Value;
+        await OnComparisonToggled.InvokeAsync(ComparisonEnabled);
+    }
+    
+    private void ToggleTechnicalIndicators()
+    {
+        ShowTechnicalIndicators = !ShowTechnicalIndicators;
+        StateHasChanged();
+        
+        // In a real implementation, this would update the chart to show/hide technical indicators
+    }
+    
+    private async Task ExportChart()
+    {
+        // In a real implementation, this would export the chart as an image
+        await Task.Delay(100); // Simulate export
+    }
+    
+    public class ChartInteractionEventArgs
+    {
+        public string SeriesName { get; set; }
+        public string Label { get; set; }
+        public (decimal Value, decimal? Change)? DataPoint { get; set; }
+        public Dictionary<string, decimal?> TechnicalIndicators { get; set; }
+    }
+}
+
+<style>
+    .chart-component {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        background-color: var(--surface-color, #ffffff);
+        border-radius: 0.5rem;
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+    
+    .chart-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 1rem;
+        border-bottom: 1px solid var(--border-color, #e0e0e0);
+    }
+    
+    .chart-title {
+        margin: 0;
+        font-size: 1.2rem;
+        color: var(--text-color, #333333);
+    }
+    
+    .comparison-toggle {
+        display: flex;
+        align-items: center;
+        font-size: 0.9rem;
+        color: var(--text-color, #333333);
+    }
+    
+    .comparison-toggle input {
+        margin-right: 0.5rem;
+    }
+    
+    .chart-controls {
+        display: flex;
+        gap: 0.5rem;
+    }
+    
+    .chart-control-button {
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 0.25rem;
+        border-radius: 0.25rem;
+        transition: background-color 0.2s ease;
+    }
+    
+    .chart-control-button:hover {
+        background-color: var(--hover-bg-color, #f0f0f0);
+    }
+    
+    .chart-control-icon {
+        font-size: 1.2rem;
+    }
+    
+    .chart-container {
+        flex: 1;
+        position: relative;
+        padding: 1rem;
+        min-height: 300px;
+    }
+    
+    .chart-canvas-container {
+        width: 100%;
+        height: calc(100% - 40px);
+        position: relative;
+    }
+    
+    .chart-loading, .chart-error {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 300px;
+        color: var(--secondary-text-color, #666666);
+    }
+    
+    .chart-spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid rgba(0, 0, 0, 0.1);
+        border-radius: 50%;
+        border-top-color: var(--primary-color, #0078d4);
+        animation: chart-spin 1s ease-in-out infinite;
+        margin-bottom: 1rem;
+    }
+    
+    @@keyframes chart-spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    .chart-legend {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+    
+    .legend-item {
+        display: flex;
+        align-items: center;
+        font-size: 0.9rem;
+        color: var(--text-color, #333333);
+    }
+    
+    .legend-color {
+        width: 12px;
+        height: 12px;
+        border-radius: 2px;
+        margin-right: 0.5rem;
+    }
+    
+    /* Dark mode styles */
+    .chart-component.dark-mode {
+        --surface-color: #323130;
+        --text-color: #f3f2f1;
+        --border-color: #605e5c;
+        --hover-bg-color: #3b3a39;
+        --secondary-text-color: #c8c6c4;
+        --primary-color: #2b88d8;
+    }
+</style>

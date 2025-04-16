@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Threading;
@@ -264,7 +265,7 @@ namespace MarketCharts.Tests.ErrorHandling
             // Define safe default values
             var defaultApiKey = "demo";
             var defaultApiToken = "demo";
-            var defaultRetryMinutes = 30;
+            var defaultRetryMinutes = 60;
             var defaultMaxRetries = 3;
             var defaultRetryDelay = 1000;
 
